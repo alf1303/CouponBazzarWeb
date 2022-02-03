@@ -1,11 +1,11 @@
 import ReactDOM from "react-dom";
 import React from 'react';
+import '../index.css';
+import { Container } from '../Container';
 import { Signer } from '@waves/signer';
 import { ProviderCloud } from '@waves.exchange/provider-cloud';
 import { ProviderWeb } from '@waves.exchange/provider-web';
 import { broadcast, invokeScript, nodeInteraction } from "@waves/waves-transactions"
-import regeneratorRuntime from "regenerator-runtime";
-import { publicKey, TEST_NET_CHAIN_ID } from "@waves/ts-lib-crypto";
 import { getTxData, getCallTxData, getSupplNameKey, getCustomerNameKey } from "../helper";
 
 const LOGGEDBY = {keeper: "KEEPER", seed: "SEED", email: "EMAIL"};
@@ -27,50 +27,49 @@ class App extends React.Component {
             error: "None",
             recipient: "",
             userStatus: "",
-            logger: ""
+            logger: "",
+            itemData : {
+                title: "title",
+                price: 0,
+                count: 0,
+                description: "simple desc"
+            }        
         };
         this.authFuncKeeper = this.authFuncKeeper.bind(this);
         this.authFuncSigner = this.authFuncSigner.bind(this);
         this.authFuncSignerSeed = this.authFuncSignerSeed.bind(this);
-        this.addItem = this.addItem.bind(this);
+        this.onChange = this.onChange.bind(this);
         this.register = this.register.bind(this);
         this.unregister = this.unregister.bind(this);
     }
 
-    async addItem() {
-        console.log("Add Item");
+    // handle changes on item creation form
+    onChange = e => {
+        const {id, value} = e.target;
+
+        this.setState(prevState => {
+            let ntr = Object.assign({}, prevState.itemData);
+            ntr[id] = value;
+            prevState.itemData = ntr
+            return { prevState };
+        })
+        console.log(this.state.itemData);
     }
+
+    // hamdle submit on item creation form
+    onSubmit = async (event) => {
+        event.preventDefault(event);
+        console.log("Add item to dApp storage");
+        let tx = getCallTxData("createItem", this.state.itemData.title, this.state.itemData.price, this.state.itemData.description);
+        let txData = getTxData("createItem", this.state.itemData.title, this.state.itemData.price, this.state.itemData.description);
+        await this.makeInvokeTransaction(tx, txData);
+      };
 
     async loadItems() {
 
     }
 
-    async register(flag) {
-        console.log("Registering... flag:" + flag);
-        console.log("PubKey: " + this.state.publicKey);
-        if(flag) var dataStr = 'SUPPLIER'; else var dataStr = "CUSTOMER";
-        let tx = getCallTxData("register", dataStr);
-        let txData = getTxData("register", dataStr);
-        console.log("Bef Logger: " + this.state.logger);
-        if(this.state.logger == LOGGEDBY.keeper) {
-            WavesKeeper.signAndPublishTransaction(tx).then(data => console.log(data)).catch(err => console.warn(err));
-        } else if(this.state.logger == LOGGEDBY.seed) {
-            let ttx = signer.invoke(txData).broadcast();
-            signer.waitTxConfirm(ttx, 0).then((tx) => {
-                console.log(tx);
-            }).catch((err) => console.error(err));
-        }
-        setTimeout(() => {
-            console.log("Refreshing...");
-            this.setUserStatus(this.state.address)
-        }, 10000);
-    }
-
-    async unregister() {
-        console.log("Unregistering....");
-        var dataStr = this.state.userStatus;
-        let tx = getCallTxData("unregister", dataStr);
-        let txData = getTxData("unregister", dataStr);
+    async makeInvokeTransaction(tx, txData) {
         if(this.state.logger == LOGGEDBY.keeper) {
             WavesKeeper.signAndPublishTransaction(tx).then(data => console.log(data)).catch(err => console.warn(err));
         } else if(this.state.logger == LOGGEDBY.seed) {
@@ -87,12 +86,30 @@ class App extends React.Component {
         }, 10000);
     }
 
+    async register(flag) {
+        console.log("Registering... flag:" + flag);
+        console.log("PubKey: " + this.state.publicKey);
+        if(flag) var dataStr = 'SUPPLIER'; else var dataStr = "CUSTOMER";
+        let tx = getCallTxData("register", dataStr);
+        let txData = getTxData("register", dataStr);
+        console.log("Bef Logger: " + this.state.logger);
+        await this.makeInvokeTransaction(tx, txData);
+    }
+
+    async unregister() {
+        console.log("Unregistering....");
+        var dataStr = this.state.userStatus;
+        let tx = getCallTxData("unregister", dataStr);
+        let txData = getTxData("unregister", dataStr);
+        await this.makeInvokeTransaction(tx, txData);
+    }
+
     async setUserStatus (addr) {
         console.log("Setting user status: " + addr);
         let supplierName = null;
         let customerName = null;
-        supplierName = await nodeInteraction.accountDataByKey(this.getSupplNameKey(addr), dAppAddress, nodeUrl);
-        customerName = await nodeInteraction.accountDataByKey(this.getCustomerNameKey(addr), dAppAddress, nodeUrl);
+        supplierName = await nodeInteraction.accountDataByKey(getSupplNameKey(addr), dAppAddress, nodeUrl);
+        customerName = await nodeInteraction.accountDataByKey(getCustomerNameKey(addr), dAppAddress, nodeUrl);
         let userStatus = "";
         let userName = "";
         if(supplierName != null) {
@@ -174,7 +191,8 @@ class App extends React.Component {
         const renderUserButtons = () => {
             if(isSupplier) {
                 return <div>
-                    <button className="btn btn-secondary" onClick={this.addItem}>AddItem</button>
+                    {/* <button className="btn btn-secondary" onClick={this.addItem}>AddItem</button> */}
+                    <Container triggerText="Add Item" onSubmit={this.onSubmit} itemData={this.state.itemData} onChange={this.onChange}/>
                     <span>Welcome Supplier {this.state.userName}</span>
                     <button className="btn btn-secondary mx-2" onClick={() => this.unregister()}>Unregister</button> 
                 </div>

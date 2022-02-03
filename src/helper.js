@@ -1,24 +1,30 @@
 const dAppAddress = '3Muxd5JEAQz655DDi2yiZxSQ63jVJJHrQyV';
 
 
-function getTxData(funcName, param1) {
+function getTxData(funcName, ...params) {
+    console.warn(params);
+    let args = [];
+    params.forEach(e => {
+        let typer = isNaN(e) ? "string" : "integer";
+        let item = {
+            "type": typer,
+            "value": e.toString()
+        }
+        args.push(item);
+    })
+    console.warn(args);
     let txData = {
         dApp: dAppAddress,
         call: {
             function: funcName,
-            args: [
-                {
-                    "type":"string",
-                    "value":param1
-                }
-            ]
+            args: args
         }
     }
     return txData;
 }
 
-function getCallTxData(funcName, param1) {
-    let txData = getTxData(funcName, param1);
+function getCallTxData(funcName, ...params) {
+    let txData = getTxData(funcName, ...params);
     let tx = {
         type: 16,
         data: {
@@ -34,7 +40,11 @@ function getCallTxData(funcName, param1) {
     return tx;
 }
 
-    export { getTxData, getCallTxData };
+function getSupplNameKey(val) {   return "SUPPLIER_" + val + "_name";    }
+
+function getCustomerNameKey(val) { return "CUSTOMER_" + val + "_name"; }
+
+    export { getTxData, getCallTxData, getSupplNameKey, getCustomerNameKey };
 
     // 
   
