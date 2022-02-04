@@ -122,6 +122,11 @@ class App extends React.Component {
             assetId: null
             }
         ]
+        tx.data.payment = [
+            {amount: item.price,
+            assetId: null
+            }
+        ]
         await this.makeInvokeTransaction(tx, txData);
     }
 
@@ -285,7 +290,7 @@ class App extends React.Component {
         const renderLoadButton = () => {
             if(true) {
                 return <div>
-                <button className="btn btn-primary bg-opacity-50 mx-2" onClick={this.loadItems}>LoadItems</button>
+                <button className="btn btn-primary bg-opacity-50 mx-2" onClick={this.loadItems}>Load/Update Items List</button>
             </div>
             }
         }

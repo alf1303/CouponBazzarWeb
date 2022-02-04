@@ -32,7 +32,7 @@ function getCallTxData(funcName, ...params) {
             call: txData.call,
             fee: {
                 assetId: "WAVES",
-                tokens: "0.005"
+                tokens: "0.009"
               },
               payment: [
               ],
