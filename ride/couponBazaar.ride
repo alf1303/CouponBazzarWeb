@@ -1,0 +1,135 @@
+{-# STDLIB_VERSION 5 #-}
+{-# SCRIPT_TYPE ACCOUNT #-}
+{-# CONTENT_TYPE DAPP #-}
+let NONE = "NONE"
+
+let customer = "CUSTOMER"
+let supplier = "SUPPLIER"
+
+let ericPubKey = base58'8haEN2a7ZmkzawLmnr5rFX14X1oHi5kjt8NQUDNjSDLG'
+
+func getStringByKey(key: String) = {
+    match getString(key) {
+        case a: String => a
+        case _ => NONE
+    }
+}
+
+func getItemHash(supplier: String, title: String) = {
+    let comboTitle = supplier + title
+    "item_" + comboTitle.toBytes().sha256().toBase58String()
+}
+
+func getNameKey(type: String, addr: String) = (type + "_" + addr + "_name") #get supplier/customer key
+func getItemSupplierKey(item: String) = item + "_owner" #
+func getItemPriceKey(item: String) = item + "_price" #
+func getItemSoldOutKey(item: String) = item + "_soldout" #
+# func getItemCountKey(item: String) = item + "_count" #
+func getItemDataKey(item: String) = item + "_data" #
+
+func getValueItemSupplier(item: String) = {
+    let itemKey = getItemSupplierKey(item)
+    getStringByKey(itemKey)
+}
+
+func getSoldOutValue(item: String) = {
+    let key = getItemSoldOutKey(item)
+        match getInteger(this, key) {
+        case a: Int => a
+        case _ => 2
+    }
+}
+
+@Callable(i)
+func register (type: String) = {
+    let addr = toBase58String(i.caller.bytes)
+    if (if (isDefined(type))
+        then if ((type == customer))
+            then true
+            else (type == supplier)
+        else false)
+        then [StringEntry(getNameKey(type, addr), addr)]
+        else throw("Invalid func parameters")
+    }
+
+@Callable(i)
+func createItem(title: String, price: Int, data: String) = {
+    let supplierAddress = i.caller.bytes.toBase58String()
+    let item = getItemHash(supplierAddress, title)
+    if (price <= 0) then throw("Price can not be negative value or zero")
+    else if(getValueItemSupplier(item) != NONE) then throw("Item already exists")
+    else [
+        StringEntry(getItemSupplierKey(item), supplierAddress),
+        IntegerEntry(getItemPriceKey(item), price),
+        IntegerEntry(getItemSoldOutKey(item), 0),
+        StringEntry(getItemDataKey(item), data)
+    ]
+}
+
+@Callable(i)
+func purchase(title: String, supplier: String, data: String) = {
+    if(size(i.payments) > 0) then {
+        let payment = getElement(i.payments, 0)
+        if(isDefined(title) && isDefined(supplier)) then {
+            if(isDefined(payment.assetId)) then throw("Only should pay in waves")
+            else {
+                let customerAddr = i.caller.bytes.toBase58String()
+                let item = getItemHash(supplier, title)
+                let price = match getInteger(this, getItemPriceKey(item)) {
+                    case p: Int => p
+                    case _=> 0
+                }
+                let soldout = getSoldOutValue(item)
+                if(soldout != 0) then throw("Item is already sold, res: " + toString(soldout))
+                else {
+                    if(payment.amount > price) then throw("payment cant be higher than price")
+                    else if(payment.amount < price) then throw("payment cant be lower than price")
+                    else {
+                        [
+                            DeleteEntry(getItemSupplierKey(item)),
+                            DeleteEntry(getItemPriceKey(item)),
+                            DeleteEntry(getItemDataKey(item)),
+                            DeleteEntry(getItemSoldOutKey(item)),
+                            StringEntry(getItemSupplierKey(item), customerAddr),
+                            IntegerEntry(getItemPriceKey(item), price),
+                            IntegerEntry(getItemSoldOutKey(item), 1),
+                            StringEntry(getItemDataKey(item), data),
+                            StringEntry("status:purchase_" + item +"_supplier_" + supplier + "_customer_" + customerAddr, "confirmed"),
+                            IntegerEntry("price:purchase_" + item + "_supplier_" + supplier + "_customer_" + customerAddr, price)
+                        ]
+                    }
+                }
+            }
+        } else throw("Coupon title and supplier address should be present")
+    } else throw("Please attach payment")
+}
+
+@Callable(i) #for fast deleting during manual testing through dApp interface
+func deleteItem(title: String) = {
+    let supplierAddress = i.caller.bytes.toBase58String()
+    let item = getItemHash(supplierAddress, title)
+    if(getValueItemSupplier(item) != NONE) then
+        [
+            DeleteEntry(getItemSupplierKey(item)),
+            DeleteEntry(getItemPriceKey(item)),
+            DeleteEntry(getItemDataKey(item)),
+            DeleteEntry(getItemSoldOutKey(item))
+        ]
+    else throw("No such item present")
+}
+
+@Callable(i) # for test purpose
+func deleteEntry (key: String) = if ((i.callerPublicKey == ericPubKey))
+    then [DeleteEntry(key)]
+    else throw("Only Eric can delete entries")
+
+@Callable(i)
+func unregister(type: String) = if (type == supplier || type == customer)
+then
+  let addr = toBase58String(i.caller.bytes)
+  [DeleteEntry(getNameKey(type, addr))]
+else throw("Illegal argument")
+
+
+@Verifier(tx)
+func verify () = sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)
