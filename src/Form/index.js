@@ -5,7 +5,7 @@ export class Form extends React.Component {
     super(props);
     this.state = {
       title: props.itemData.title,
-      count: props.itemData.count,
+      // count: props.itemData.count,
       price: props.itemData.price,
       description: props.itemData.description
     }

@@ -34,7 +34,8 @@ function getCallTxData(funcName, ...params) {
                 assetId: "WAVES",
                 tokens: "0.005"
               },
-              payment: [],
+              payment: [
+              ],
         }
     }
     return tx;
